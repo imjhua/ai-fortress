@@ -30,7 +30,7 @@ function turretPivot(t){
  const a=tankSlope(t),c=Math.cos(a),s=Math.sin(a);
  return {x:t.x+14*s,y:tankY(t)-14*c};
 }
-function log(msg){const p=document.createElement('p');p.textContent=msg;$('log').prepend(p);while($('log').children.length>35)$('log').lastChild.remove()}
+function log(msg){}
 function newGame(){const seed=Math.floor(Math.random()*2**32);state={seed,heights:terrain(seed),player:{x:110,hp:100},ai:{x:850,hp:100},wind:0,phase:'player',currentActor:'player',round:1,shots:0,score:0,direct:0,projectile:null,explosion:null,damageEffects:[],matchId:crypto.randomUUID?.()||String(Date.now()),turnId:0,token:(state?.token||0)+1,aiProvider:'local',winner:null};$('overlay').classList.add('hidden');$('log').replaceChildren();lastPlayerPower=null;lastPowerByActor={player:null,ai:null};resetCharge();resetDecisionPanel();$('angle').value=45;nextWind();log(`새 게임 시작 · 지형 시드 ${seed}`);update();render();scheduleBot()}
 function nextWind(){state.wind=Math.floor(Math.random()*21)-10}
 function movePlayer(delta){
@@ -41,7 +41,7 @@ function movePlayer(delta){
   const next=clamp(t.x+delta,25,W-25);if(Math.abs(next-other.x)>=45)t.x=next;
 }
 
-function update(){if(!state)return;const a=state.currentActor;const human=isHumanTurn();$('php').textContent=state.player.hp;$('ahp').textContent=state.ai.hp;$('pbar').style.width=state.player.hp+'%';$('abar').style.width=state.ai.hp+'%';$('p1name').textContent='1P '+typeLabel(playerTypes.player);$('p2name').textContent='2P '+typeLabel(playerTypes.ai);$('turn').textContent=state.phase==='player'?`${actorName(a)} ${human?'사용자 턴':actorType(a)==='jev'?'Jev 판단 중...':'Physics Bot 계산 중...'}`:({flight:'포탄 비행 중',resolve:'폭발!',over:'게임 종료'})[state.phase];$('wind').textContent=`바람 ${state.wind>=0?'→':'←'} ${Math.abs(state.wind)}`;$('round').textContent=`ROUND ${state.round}/${MAX_TURNS}`;$('powerValue').textContent=chargedPower+'%';$('powerFill').style.width=chargedPower+'%';$('powerMeter').setAttribute('aria-valuenow',String(chargedPower));$('p1hud').classList.toggle('active-turn',gameStarted&&state.phase==='player'&&a==='player');$('p2hud').classList.toggle('active-turn',gameStarted&&state.phase==='player'&&a==='ai');document.querySelectorAll('#touchControls button').forEach(button=>button.disabled=!human);$('angle').disabled=!human;$('powerMeter').setAttribute('aria-disabled',String(!human));$('powerValue').parentElement.parentElement.parentElement.classList.toggle('is-hidden',!human)}
+function update(){if(!state)return;const a=state.currentActor;const human=isHumanTurn();$('php').textContent=state.player.hp;$('ahp').textContent=state.ai.hp;$('pbar').style.width=state.player.hp+'%';$('abar').style.width=state.ai.hp+'%';$('p1hpMeter').setAttribute('aria-valuenow',String(state.player.hp));$('p2hpMeter').setAttribute('aria-valuenow',String(state.ai.hp));$('pbar').classList.toggle('hp-critical',state.player.hp<=25);$('abar').classList.toggle('hp-critical',state.ai.hp<=25);$('p1name').textContent='1P '+typeLabel(playerTypes.player);$('p2name').textContent='2P '+typeLabel(playerTypes.ai);$('turn').textContent=state.phase==='player'?`${actorName(a)} ${human?'사용자 턴':actorType(a)==='jev'?'Jev 판단 중...':'Physics Bot 계산 중...'}`:({flight:'포탄 비행 중',resolve:'폭발!',over:'게임 종료'})[state.phase];$('wind').textContent=`${state.wind===0?'●':state.wind>0?'➜':'⬅'} 바람 ${Math.abs(state.wind)} ${state.wind===0?'· 무풍':state.wind>0?'· 오른쪽':'· 왼쪽'}`;$('wind').classList.toggle('wind-calm',state.wind===0);$('round').textContent=`ROUND ${state.round}/${MAX_TURNS}`;$('powerValue').textContent=chargedPower+'%';$('powerFill').style.width=chargedPower+'%';$('powerMeter').setAttribute('aria-valuenow',String(chargedPower));$('p1hud').classList.toggle('active-turn',gameStarted&&state.phase==='player'&&a==='player');$('p2hud').classList.toggle('active-turn',gameStarted&&state.phase==='player'&&a==='ai');document.querySelectorAll('#touchControls button').forEach(button=>button.disabled=!human);$('angle').disabled=!human;$('powerMeter').setAttribute('aria-disabled',String(!human));$('powerValue').closest('.controls').classList.toggle('is-inactive',!human);$('touchControls').classList.toggle('is-inactive',!human)}
 function scheduleBot(){if(!gameStarted||state.phase!=='player'||!['physics','jev'].includes(actorType(currentActor())))return;const token=state.token,actor=currentActor();setTimeout(()=>{if(token===state.token&&state.phase==='player'&&currentActor()===actor)(actorType(actor)==='jev'?jevTurn(token,actor):botTurn(token,actor))},450)}
 
 function origin(t,angle,direction){
@@ -113,9 +113,6 @@ async function jevTurn(token,actor){
  }catch(error){if(token!==state.token)return;$('jevStatus').textContent='판단 실패';$('decisionResult').textContent=`Jev 응답 실패: ${error.message}. 다른 AI로 대체하지 않습니다.`;log('Jev 오류: '+error.message);state.phase='jev-error';update()}
 }
 function endGame(){state.phase='over';state.winner=state.ai.hp===state.player.hp?'draw':state.ai.hp<state.player.hp?'player':'ai';if(state.winner==='player')state.score+=1000+state.player.hp*5+Math.max(0,MAX_TURNS-state.round)*50;else if(state.winner==='draw')state.score+=300;$('resultTitle').textContent=state.winner==='player'?'🏆 1P 승리!':state.winner==='ai'?'🏆 2P 승리!':'🤝 무승부';$('resultInfo').textContent=`점수 ${state.score.toLocaleString()} · ${state.round}라운드 · 지형 시드 ${state.seed}`;$('overlay').classList.remove('hidden');update()}
-function ranks(){try{return JSON.parse(localStorage.getItem('ai-fortress-ranks')||'[]')}catch{return []}}
-function showRanks(){const ol=$('ranking');ol.replaceChildren();for(const item of ranks().slice(0,10)){const li=document.createElement('li');li.textContent=item.name+' ';const score=document.createElement('span');score.textContent=item.score.toLocaleString();li.append(score);ol.append(li)}if(!ol.children.length){const li=document.createElement('li');li.textContent='아직 기록이 없습니다.';ol.append(li)}}
-function saveRank(){const name=($('nickname').value.trim()||'PLAYER').slice(0,16);const list=ranks();list.push({name,score:state.score,date:new Date().toISOString(),seed:state.seed});list.sort((a,b)=>b.score-a.score);localStorage.setItem('ai-fortress-ranks',JSON.stringify(list.slice(0,50)));$('save').disabled=true;showRanks();log('점수 저장 완료')}
 function drawActiveTurn(t,name,now){
  if(!gameStarted||state.phase!=='player'||state.currentActor!==name)return;
  const y=tankY(t),pulse=(Math.sin(now*.005)+1)/2;
@@ -135,6 +132,9 @@ function drawTank(t,color,dir,angle,name,now){
  const elapsed=effect?now-effect.started:0;
  const shake=effect&&elapsed<350?Math.sin(elapsed*.11)*Math.max(0,1-elapsed/350)*5:0;
  ctx.save();ctx.translate(t.x+shake,y);
+ // Enlarge only the tank artwork on small screens; physics/hitboxes stay unchanged.
+ const mobileTankScale=window.matchMedia('(max-width: 650px)').matches?1.65:1;
+ ctx.scale(mobileTankScale,mobileTankScale);
  if(effect&&Math.floor(elapsed/85)%2===0){ctx.shadowColor='#ff3b30';ctx.shadowBlur=22;}
  // The chassis follows the tangent of the terrain, while the barrel keeps
  // its absolute aiming angle. This matches the projectile's launch direction.
@@ -155,22 +155,34 @@ function drawTank(t,color,dir,angle,name,now){
 }
 function drawWind(now){
  const wind=state.wind;
- if(wind===0)return;
- const speed=14+Math.abs(wind)*10;
+ const magnitude=Math.abs(wind);
  const direction=Math.sign(wind);
- ctx.save();ctx.lineWidth=1.6;ctx.lineCap='round';
- for(let i=0;i<34;i++){
-  const phase=(i*97.31+now*.001*speed)% (W+120);
-  const x=direction>0?phase-60:W+60-phase;
-  const y=55+(i*61.7)%190+Math.sin(now*.0018+i*1.7)*7;
-  const len=9+Math.abs(wind)*1.9+(i%4)*3;
-  const alpha=(.13+Math.abs(wind)*.027)*(0.75+0.25*Math.sin(now*.002+i));
-  ctx.strokeStyle=`rgba(255,255,255,${alpha.toFixed(3)})`;
-  ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x+direction*len*.5,y-3,x+direction*len,y-1);ctx.stroke();
+ ctx.save();
+ // A dark translucent badge keeps the direction and strength readable over bright sky.
+ const label=wind===0?'●  무풍':`${direction>0?'➜':'⬅'}  바람 ${magnitude}`;
+ ctx.font='bold 21px system-ui, sans-serif';
+ ctx.textAlign='center';ctx.textBaseline='middle';
+ const badgeWidth=Math.max(134,ctx.measureText(label).width+32);
+ const bx=(W-badgeWidth)/2;
+ ctx.fillStyle='rgba(22,42,65,.88)';
+ ctx.beginPath();ctx.roundRect(bx,15,badgeWidth,44,13);ctx.fill();
+ ctx.fillStyle=wind===0?'#dbe8f7':'#ffffff';
+ ctx.fillText(label,W/2,37);
+ if(wind!==0){
+  // Contrasting moving streaks make wind visible even on a small mobile canvas.
+  const speed=26+magnitude*12;
+  ctx.lineCap='round';ctx.lineWidth=3;
+  for(let i=0;i<27;i++){
+   const phase=(i*113.73+now*.001*speed)%(W+180);
+   const x=direction>0?phase-90:W+90-phase;
+   const y=85+(i*59.3)%172+Math.sin(now*.0017+i)*5;
+   const len=17+magnitude*2.5+(i%3)*6;
+   ctx.strokeStyle=`rgba(32,83,128,${(0.40+magnitude*.018).toFixed(3)})`;
+   ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x+direction*len*.5,y-4,x+direction*len,y-1);ctx.stroke();
+   ctx.strokeStyle='rgba(255,255,255,.86)';ctx.lineWidth=1.3;
+   ctx.beginPath();ctx.moveTo(x,y-3);ctx.lineTo(x+direction*len*.75,y-4);ctx.stroke();ctx.lineWidth=3;
+  }
  }
- // Subtle wind direction indicator, not a projectile trajectory.
- ctx.font='bold 13px sans-serif';ctx.textAlign='center';
- ctx.fillStyle='rgba(39,75,102,.65)';ctx.fillText(`${direction>0?'→':'←'} ${Math.abs(wind)}`,W/2,34);
  ctx.restore();
 }
 function render(){
@@ -189,8 +201,6 @@ function render(){
 function frame(now){updateCharge(now);const elapsed=Math.min((now-last)/1000||0,.05);last=now;if(state?.projectile){const s=state.projectile;const steps=Math.max(1,Math.ceil(elapsed/DT));for(let i=0;i<steps;i++){s.t+=elapsed/steps;const p=point(s,s.t),prev=s.prev;let hit=null;for(let j=1;j<=4;j++){const f=j/4;hit=collide({x:prev.x+(p.x-prev.x)*f,y:prev.y+(p.y-prev.y)*f});if(hit)break}if(hit){finishShot(hit,s.actor);break}s.prev=p;if(s.t>5){finishShot({x:clamp(p.x,0,W-1),y:clamp(p.y,0,H),kind:'miss'},s.actor);break}}}render();raf=requestAnimationFrame(frame)}
 $('new').onclick=()=>showSetup();
 $('again').onclick=()=>showSetup();
-$('save').onclick=saveRank;
-$('clearRank').onclick=()=>{if(confirm('로컬 랭킹을 삭제할까요?')){localStorage.removeItem('ai-fortress-ranks');showRanks()}};
 $('angle').oninput=update;
 // Keyboard and mobile controls share the same gameplay functions.
 function adjustAngle(delta){if(!isHumanTurn()||charging)return;$('angle').value=clamp(Number($('angle').value)+delta,10,80);update()}
@@ -241,5 +251,5 @@ async function checkJev(){try{const r=await fetch('/api/jev/status',{cache:'no-s
 function showSetup(){stopTouchHold();gameStarted=false;charging=false;$('setup').classList.remove('hidden');$('overlay').classList.add('hidden');if(state){state.token++;state.phase='over'}updateSetup()}
 function updateSetup(){const p1=$('p1type').value,p2=$('p2type').value,hasJev=p1==='jev'||p2==='jev';$('startGame').disabled=hasJev&&!jevConfigured;$('setupNotice').textContent=hasJev?(jevConfigured?'Jev 어댑터 설정됨 · 실제 API 응답을 검증하며 대전합니다.':'Jev 연결 대기 · 서버에 JEV_ADAPTER_URL 설정이 필요합니다.'):'선택한 구성으로 대전을 시작할 수 있습니다.'}
 $('p1type').addEventListener('change',updateSetup);$('p2type').addEventListener('change',updateSetup);
-$('startGame').onclick=()=>{if(($('p1type').value==='jev'||$('p2type').value==='jev')&&!jevConfigured)return;playerTypes={player:$('p1type').value,ai:$('p2type').value};gameStarted=true;$('setup').classList.add('hidden');$('save').disabled=false;newGame()};
-showRanks();updateSetup();checkJev();requestAnimationFrame(frame);
+$('startGame').onclick=()=>{if(($('p1type').value==='jev'||$('p2type').value==='jev')&&!jevConfigured)return;playerTypes={player:$('p1type').value,ai:$('p2type').value};gameStarted=true;$('setup').classList.add('hidden');newGame()};
+updateSetup();checkJev();requestAnimationFrame(frame);
