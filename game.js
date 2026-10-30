@@ -41,7 +41,7 @@ function movePlayer(delta){
   const next=clamp(t.x+delta,25,W-25);if(Math.abs(next-other.x)>=45)t.x=next;
 }
 
-function update(){if(!state)return;const a=state.currentActor;const human=isHumanTurn();$('php').textContent=state.player.hp;$('ahp').textContent=state.ai.hp;$('pbar').style.width=state.player.hp+'%';$('abar').style.width=state.ai.hp+'%';$('p1hpMeter').setAttribute('aria-valuenow',String(state.player.hp));$('p2hpMeter').setAttribute('aria-valuenow',String(state.ai.hp));$('pbar').classList.toggle('hp-critical',state.player.hp<=25);$('abar').classList.toggle('hp-critical',state.ai.hp<=25);$('p1name').textContent='1P '+typeLabel(playerTypes.player);$('p2name').textContent='2P '+typeLabel(playerTypes.ai);$('turn').textContent=state.phase==='player'?`${actorName(a)} ${human?'사용자 턴':actorType(a)==='jev'?'Jev 판단 중...':'Physics Bot 계산 중...'}`:({flight:'포탄 비행 중',resolve:'폭발!',over:'게임 종료'})[state.phase];$('wind').textContent=`${state.wind===0?'●':state.wind>0?'➜':'⬅'} 바람 ${Math.abs(state.wind)} ${state.wind===0?'· 무풍':state.wind>0?'· 오른쪽':'· 왼쪽'}`;$('wind').classList.toggle('wind-calm',state.wind===0);$('round').textContent=`ROUND ${state.round}/${MAX_TURNS}`;$('powerValue').textContent=chargedPower+'%';$('powerFill').style.width=chargedPower+'%';$('powerMeter').setAttribute('aria-valuenow',String(chargedPower));$('p1hud').classList.toggle('active-turn',gameStarted&&state.phase==='player'&&a==='player');$('p2hud').classList.toggle('active-turn',gameStarted&&state.phase==='player'&&a==='ai');document.querySelectorAll('#touchControls button').forEach(button=>button.disabled=!human);$('angle').disabled=!human;$('powerMeter').setAttribute('aria-disabled',String(!human));$('powerValue').closest('.controls').classList.toggle('is-inactive',!human);$('touchControls').classList.toggle('is-inactive',!human)}
+function update(){if(!state)return;const a=state.currentActor;const human=isHumanTurn();$('php').textContent=state.player.hp;$('ahp').textContent=state.ai.hp;$('pbar').style.width=state.player.hp+'%';$('abar').style.width=state.ai.hp+'%';$('p1hpMeter').setAttribute('aria-valuenow',String(state.player.hp));$('p2hpMeter').setAttribute('aria-valuenow',String(state.ai.hp));$('pbar').classList.toggle('hp-critical',state.player.hp<=25);$('abar').classList.toggle('hp-critical',state.ai.hp<=25);$('p1name').textContent='1P '+typeLabel(playerTypes.player);$('p2name').textContent='2P '+typeLabel(playerTypes.ai);$('turn').textContent=state.phase==='player'?`${actorName(a)} ${human?'사용자 턴':actorType(a)==='jev'?'Jev 판단 중...':'Physics Bot 계산 중...'}`:({flight:'포탄 비행 중',resolve:'폭발!',over:'게임 종료'})[state.phase];$('round').textContent=`ROUND ${state.round}/${MAX_TURNS}`;$('powerValue').textContent=chargedPower+'%';$('powerFill').style.width=chargedPower+'%';$('powerMeter').setAttribute('aria-valuenow',String(chargedPower));$('p1hud').classList.toggle('active-turn',gameStarted&&state.phase==='player'&&a==='player');$('p2hud').classList.toggle('active-turn',gameStarted&&state.phase==='player'&&a==='ai');document.querySelectorAll('#touchControls button').forEach(button=>button.disabled=!human);$('angle').disabled=!human;$('powerMeter').setAttribute('aria-disabled',String(!human));$('powerValue').closest('.controls').classList.toggle('is-inactive',!human);$('touchControls').classList.toggle('is-inactive',!human)}
 function scheduleBot(){if(!gameStarted||state.phase!=='player'||!['physics','jev'].includes(actorType(currentActor())))return;const token=state.token,actor=currentActor();setTimeout(()=>{if(token===state.token&&state.phase==='player'&&currentActor()===actor)(actorType(actor)==='jev'?jevTurn(token,actor):botTurn(token,actor))},450)}
 
 function origin(t,angle,direction){
@@ -164,24 +164,41 @@ function drawWind(now){
  ctx.textAlign='center';ctx.textBaseline='middle';
  const badgeWidth=Math.max(134,ctx.measureText(label).width+32);
  const bx=(W-badgeWidth)/2;
- ctx.fillStyle='rgba(22,42,65,.88)';
+ ctx.fillStyle='rgba(105,115,125,.72)';
  ctx.beginPath();ctx.roundRect(bx,15,badgeWidth,44,13);ctx.fill();
  ctx.fillStyle=wind===0?'#dbe8f7':'#ffffff';
  ctx.fillText(label,W/2,37);
- if(wind!==0){
-  // Contrasting moving streaks make wind visible even on a small mobile canvas.
-  const speed=26+magnitude*12;
-  ctx.lineCap='round';ctx.lineWidth=3;
-  for(let i=0;i<27;i++){
-   const phase=(i*113.73+now*.001*speed)%(W+180);
-   const x=direction>0?phase-90:W+90-phase;
-   const y=85+(i*59.3)%172+Math.sin(now*.0017+i)*5;
-   const len=17+magnitude*2.5+(i%3)*6;
-   ctx.strokeStyle=`rgba(32,83,128,${(0.40+magnitude*.018).toFixed(3)})`;
-   ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x+direction*len*.5,y-4,x+direction*len,y-1);ctx.stroke();
-   ctx.strokeStyle='rgba(255,255,255,.86)';ctx.lineWidth=1.3;
-   ctx.beginPath();ctx.moveTo(x,y-3);ctx.lineTo(x+direction*len*.75,y-4);ctx.stroke();ctx.lineWidth=3;
-  }
+ // Four airy, single-stroke wind curls; no double strokes, arrows or shadows.
+ // Their drift direction and speed follow the actual wind without changing physics.
+ const curls=[
+  {x:82,y:113,length:89,scale:1.00},
+  {x:370,y:183,length:113,scale:1.14},
+  {x:675,y:112,length:97,scale:.92},
+  {x:850,y:268,length:105,scale:1.06}
+ ];
+ const driftSpeed=magnitude===0?0:16+magnitude*8;
+ ctx.strokeStyle='rgba(255,255,255,0.75)';
+ ctx.lineWidth=2.8;
+ ctx.lineCap='round';
+ ctx.lineJoin='round';
+ for(const [i,curl] of curls.entries()){
+  const travel=now*.001*driftSpeed;
+  const offset=direction===0?0:direction*travel;
+  const x=((curl.x+offset+160)%(W+320)+(W+320))%(W+320)-160;
+  const y=curl.y;
+  const len=curl.length;
+  // Mirror the curling tail when wind blows left.
+  ctx.save();
+  ctx.translate(x,y);
+  if(direction<0)ctx.scale(-1,1);
+  ctx.scale(curl.scale,curl.scale);
+  ctx.beginPath();
+  ctx.moveTo(-len*.52,0);
+  ctx.bezierCurveTo(-len*.28,-5,len*.13,1,len*.34,-2);
+  ctx.bezierCurveTo(len*.56,-5,len*.57,-26,len*.43,-27);
+  ctx.bezierCurveTo(len*.31,-28,len*.26,-16,len*.34,-15);
+  ctx.stroke();
+  ctx.restore();
  }
  ctx.restore();
 }

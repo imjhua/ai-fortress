@@ -59,7 +59,26 @@
 /* v1.6: compact power HUD and more prominent tanks on mobile */
 @media(max-width:650px){.power-control{padding-bottom:2px}.stage canvas{image-rendering:auto}}
 
-/* v1.7: wind strength/direction legibility on desktop and mobile */
-.center #wind{display:inline-flex;align-items:center;justify-content:center;align-self:center;white-space:nowrap;min-height:27px;padding:4px 10px;border:1px solid #6e9ac5;border-radius:999px;background:#294e75;color:#fff;font-size:13px;font-weight:800;letter-spacing:.1px;font-variant-numeric:tabular-nums;box-shadow:0 1px 5px #0002}
-.center #wind.wind-calm{background:#34465c;border-color:#64768b}
-@media(max-width:650px){.center #wind{font-size:10px;padding:4px 6px;min-height:25px;white-space:normal;text-align:center;line-height:1.15}}
+/* v2.0: reserve identical HUD card geometry for active and inactive turns. */
+.hud{align-items:stretch}
+.hud .hp{
+  box-sizing:border-box;
+  flex:0 1 32%;
+  min-height:100px;
+  border:2px solid transparent;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+.hud .hp.active-turn{border-width:2px}
+.hud .hp .bar{flex-shrink:0}
+@media(max-width:650px){
+  .hud .hp{flex:0 1 34%;min-height:76px}
+}
+@media (hover:none) and (pointer:coarse) and (orientation:landscape) and (max-height:550px){
+  .hud .hp{min-height:72px}
+}
+
+/* v2.4: Keep both player profiles visible; reserve the center column
+   without showing turn or round labels. */
+.hud > .center { visibility: hidden; }
