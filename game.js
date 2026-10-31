@@ -156,7 +156,8 @@ function settleTank(t){
  return 0;
 }
 function advanceTankFall(t,dt){
- if(!t.falling||t.hp<=0)return;
+ if(!t.falling)return;
+  if(t.hp<=0){t.falling=false;t.vy=0;t.fallStart=null;return;}
  const feet=t.y+12;
  const nextVy=Math.min(650,(t.vy||0)+1050*dt);
  const nextFeet=feet+nextVy*dt;
@@ -462,8 +463,9 @@ function finishShot(hit,actor){
  const token=state.token;
  setTimeout(function finishResolution(){
   if(token!==state.token||state.phase==='over')return;
+  if(state.player.hp<=0||state.ai.hp<=0){endGame();return;}
   if(state.player.falling||state.ai.falling){setTimeout(finishResolution,80);return;}
-  if(state.player.hp<=0||state.ai.hp<=0||(state.round>=MAX_TURNS&&actor==='ai')){endGame();return}
+  if(state.round>=MAX_TURNS&&actor==='ai'){endGame();return}
   if(actor==='player')state.currentActor='ai';else{state.round++;state.currentActor='player'}
   state.phase='player';nextWind();update();scheduleBot();
  },500);

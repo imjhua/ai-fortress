@@ -229,3 +229,49 @@
 
 /* Background music toggle */
 #bgmToggle{white-space:nowrap;padding:9px 12px;font-size:12px}@media(max-width:600px){.top{gap:6px}#bgmToggle{padding:8px;font-size:11px}}
+
+/* v6.8: Mobile controls are vertically stacked with a safe text gap. */
+@media (hover:none) and (pointer:coarse) {
+  .touch-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    padding: 14px 12px 18px;
+  }
+  .touch-dpad {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 52px));
+    grid-template-rows: repeat(2, 48px);
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+  .touch-controls .touch-dpad button {
+    width: 52px;
+    min-height: 48px;
+    touch-action: none;
+  }
+  .touch-controls .touch-space {
+    width: min(100%, 280px);
+    max-width: none;
+    min-height: 54px;
+    margin: 0;
+    touch-action: none;
+  }
+  .touch-controls .touch-hint {
+    display: block;
+    margin-top: 20px;
+    line-height: 1.6;
+    font-size: 11px;
+    text-align: center;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    pointer-events: none;
+  }
+}
+@media (hover:none) and (pointer:coarse) and (max-width:360px) {
+  .touch-dpad { grid-template-columns: repeat(3, 46px); grid-template-rows: repeat(2, 44px); }
+  .touch-controls .touch-dpad button { width: 46px; min-height: 44px; }
+}
