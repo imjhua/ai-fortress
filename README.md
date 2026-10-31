@@ -16,3 +16,21 @@
 ## v5.8
 - 시작 즉시 현재 턴 프로필 강조를 적용하고 data-current-turn 속성 값을 명시적으로 true로 설정합니다.
 - 다음 애니메이션 프레임에서 같은 턴 상태로 강조를 다시 동기화합니다.
+
+
+## v5.9: 턴 강조 진단
+
+게임 URL 끝에 `?debugTurn=1`을 붙여 접속하고 개발자 도구 Console을 열어주세요.
+대전 설정에서 게임 시작을 누르면 `[FORTRESS:TURN]` 로그가 출력됩니다.
+특히 `startGame:after-newGame` 및 `newGame:first-frame` 항목의 `gameStarted`, `currentActor`, `hudActivePlayer`, `cards`를 확인해 주세요.
+로그에는 API Key가 포함되지 않습니다.
+
+파워 충전 막대의 둥근 끝을 직선으로 변경하여 이전 파워 기준선과 시각적으로 일치시켰습니다.
+
+
+## v6.0 startup fix
+Removed a stale `#log` DOM access from `newGame()`. The log panel was removed from HTML earlier, so calling `replaceChildren()` on null interrupted game initialization. The optional `?debugTurn=1` diagnostics remain available.
+
+### v6.2
+- 발사 파워 게이지 트랙과 충전 막대 양쪽 모서리를 모두 직각으로 변경 (`border-radius: 0`).
+- 흰색 이전 파워 기준선 및 기존 게임 로직 유지.

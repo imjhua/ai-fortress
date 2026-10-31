@@ -133,3 +133,13 @@
   background:rgba(228,108,102,.23)!important;
   box-shadow:0 0 0 2px rgba(255,146,138,.16),inset 0 0 20px rgba(228,108,102,.12)!important;
 }
+
+/* v5.9: the moving charge has a flat end, so it meets the fixed reference line exactly. */
+.power-fill{border-radius:0!important;}
+.power-meter{border-radius:9px;}
+
+/* v6.1: square off the power meter's right edge; retain the left rounding. */
+.power-meter{border-top-right-radius:0;border-bottom-right-radius:0}
+
+/* v6.2: both ends of the power meter and its fill are square. */
+.power-meter, .power-fill { border-radius: 0 !important; }

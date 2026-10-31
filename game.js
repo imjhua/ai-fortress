@@ -286,7 +286,7 @@ function turretPivot(t){
  return {x:t.x+14*s,y:tankY(t)-14*c};
 }
 function log(msg){}
-function newGame(){const seed=Math.floor(Math.random()*2**32);const map=makeMap(seed);state={seed,mapType:map.kind,heights:map.heights,solid:map.solid,player:{x:110,y:0,hp:100},ai:{x:850,y:0,hp:100},wind:openingWind(),phase:'player',currentActor:'player',round:1,shots:0,score:0,direct:0,projectile:null,explosion:null,damageEffects:[],matchId:crypto.randomUUID?.()||String(Date.now()),turnId:0,token:(state?.token||0)+1,aiProvider:'local',winner:null};state.player.y=supportAt(110,0)-12;state.ai.y=supportAt(850,0)-12;rebuildTerrainImage();$('overlay').classList.add('hidden');$('log').replaceChildren();lastPlayerPower=null;lastPowerByActor={player:null,ai:null};resetCharge();resetDecisionPanel();$('angle').value=45;syncTurnProfile();log(`새 게임 시작 · 지형 시드 ${seed}`);syncTurnProfile();update();render();const initialToken=state.token;requestAnimationFrame(()=>{if(gameStarted&&state?.token===initialToken)syncTurnProfile()});scheduleBot()}
+function newGame(){const seed=Math.floor(Math.random()*2**32);const map=makeMap(seed);state={seed,mapType:map.kind,heights:map.heights,solid:map.solid,player:{x:110,y:0,hp:100},ai:{x:850,y:0,hp:100},wind:openingWind(),phase:'player',currentActor:'player',round:1,shots:0,score:0,direct:0,projectile:null,explosion:null,damageEffects:[],matchId:crypto.randomUUID?.()||String(Date.now()),turnId:0,token:(state?.token||0)+1,aiProvider:'local',winner:null};state.player.y=supportAt(110,0)-12;state.ai.y=supportAt(850,0)-12;rebuildTerrainImage();$('overlay').classList.add('hidden');lastPlayerPower=null;lastPowerByActor={player:null,ai:null};resetCharge();resetDecisionPanel();$('angle').value=45;log(`새 게임 시작 · 지형 시드 ${seed}`);update();syncTurnProfile('newGame:after-update');render();const initialToken=state.token;requestAnimationFrame(()=>{if(gameStarted&&state?.token===initialToken)syncTurnProfile('newGame:first-frame')});scheduleBot()}
 // The first wind is assigned when the match state is created, never left at 0.
 function openingWind(){
  const strength=1+Math.floor(Math.random()*10);
@@ -346,9 +346,27 @@ function movePlayer(delta){
  }
 }
 
+// v5.9: opt-in turn/HUD diagnostics. Enable with ?debugTurn=1 or localStorage.setItem('fortressDebugTurn','1').
+const debugTurnEnabled = new URLSearchParams(location.search).has('debugTurn') || localStorage.getItem('fortressDebugTurn') === '1';
+let turnDebugSequence = 0;
+function traceTurnProfile(reason){
+ if(!debugTurnEnabled)return;
+ const hud=document.querySelector('.hud');
+ const cards=['p1hud','p2hud'].map(id=>{
+  const el=$(id),css=getComputedStyle(el),rect=el.getBoundingClientRect();
+  return {id,classes:el.className,attribute:el.getAttribute('data-current-turn'),
+   border:css.border,outline:css.outline,background:css.backgroundColor,
+   visible:rect.width>0&&rect.height>0,selectorMatches:el.matches('[data-current-turn="true"]')};
+ });
+ console.info('[FORTRESS:TURN]',++turnDebugSequence,reason,{
+  gameStarted,phase:state?.phase,currentActor:state?.currentActor,
+  setupHidden:$('setup').classList.contains('hidden'),hudActivePlayer:hud?.dataset.activePlayer,
+  cards
+ });
+}
 // The HUD, turn label and tank badges all derive from state.currentActor.
 // No independent "focused player" state is stored.
-function syncTurnProfile(){
+function syncTurnProfile(reason="sync"){
  // Single source of truth: the actor that owns the current turn.
  const active = gameStarted && state?.phase !== 'over' ? state.currentActor : 'none';
  const hud = document.querySelector('.hud');
@@ -364,6 +382,7 @@ function syncTurnProfile(){
    card.removeAttribute('aria-current');
   }
  }
+ traceTurnProfile(reason);
 }
 
 function update(){if(!state)return;const a=state.currentActor;const human=isHumanTurn();$('php').textContent=state.player.hp;$('ahp').textContent=state.ai.hp;$('pbar').style.width=state.player.hp+'%';$('abar').style.width=state.ai.hp+'%';$('p1hpMeter').setAttribute('aria-valuenow',String(state.player.hp));$('p2hpMeter').setAttribute('aria-valuenow',String(state.ai.hp));$('pbar').classList.toggle('hp-critical',state.player.hp<=25);$('abar').classList.toggle('hp-critical',state.ai.hp<=25);$('p1name').textContent=playerTypes.player!=='human'?'AI Player':'1P 사용자';$('p2name').textContent=playerTypes.ai!=='human'?'AI Player':'2P 사용자';$('turn').textContent=state.phase==='player'?`${actorName(a)} 턴`:({flight:'포탄 비행 중',resolve:'폭발!',over:'게임 종료'})[state.phase];$('round').textContent=`ROUND ${state.round}/${MAX_TURNS}`;$('powerValue').textContent=chargedPower+'%';$('powerFill').style.width=chargedPower+'%';$('powerMeter').setAttribute('aria-valuenow',String(chargedPower));syncPowerReference();syncTurnProfile();document.querySelectorAll('#touchControls button').forEach(button=>button.disabled=!human);$('angle').disabled=!human;$('powerMeter').setAttribute('aria-disabled',String(!human));$('powerValue').closest('.controls').classList.toggle('is-inactive',!human);$('touchControls').classList.toggle('is-inactive',!human)}
@@ -655,6 +674,6 @@ $('startGame').onclick=()=>{
  if(wantsJev&&!jevConfigured)return;
  playerTypes={player:$('p1type').value,ai:$('p2type').value};
  if(wantsJev)for(const actor of ['player','ai'])if(playerTypes[actor]==='physics')playerTypes[actor]='jev';
- gameStarted=true;$('setup').classList.add('hidden');$('startGame').blur();newGame();
+ gameStarted=true;$('setup').classList.add('hidden');$('startGame').blur();newGame();traceTurnProfile('startGame:after-newGame');
 };
 updateSetup();$('startGame').focus({preventScroll:true});checkJev();requestAnimationFrame(frame);
