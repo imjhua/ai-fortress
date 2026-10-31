@@ -10,7 +10,7 @@
 .power-meter{position:relative;overflow:visible}
 
 /* v1.0 player setup */
-.setup-overlay{position:absolute;inset:0;background:#101724dc;display:grid;place-items:center;z-index:5;padding:12px}.setup-overlay.hidden{display:none}.setup-card{width:min(540px,100%);padding:26px;background:#1b293c;border:1px solid #547092;border-radius:16px;box-shadow:0 18px 50px #0007}.setup-card h2{font-size:23px}.setup-card p,.setup-card small{color:#b6c8dd;font-size:13px}.setup-card small{display:block;margin-top:12px}.setup-players{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px 0}.setup-players label{display:grid;gap:8px;font-size:14px;font-weight:700}.setup-players select{width:100%;min-width:0}.setup-notice{min-height:24px;color:#f6c174!important}.setup-card button{width:100%;background:#377bc5;font-weight:700}.setup-card button:disabled{background:#39485c}@media(max-width:500px){.setup-players{grid-template-columns:1fr}.setup-card{padding:16px}}
+.setup-overlay{position:absolute;inset:0;background:#101724dc;display:grid;place-items:center;z-index:5;padding:12px}.setup-overlay.hidden{display:none}.setup-card{width:min(540px,100%);padding:26px;background:#1b293c;border:1px solid #547092;border-radius:16px;box-shadow:0 18px 50px #0007}.setup-card h2{font-size:23px}.setup-card p,.setup-card small{color:#b6c8dd;font-size:13px}.setup-card small{display:block;margin-top:12px}.setup-players{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px 0}.setup-players label{display:grid;gap:8px;font-size:14px;font-weight:700}.setup-players select{width:100%;min-width:0}.setup-card button{width:100%;background:#377bc5;font-weight:700}#startGame{margin-top:18px}.setup-card button:disabled{background:#39485c}@media(max-width:500px){.setup-players{grid-template-columns:1fr}.setup-card{padding:16px}}
 
 /* v1.1 Jev decision observer */
 .decision-panel{margin-top:16px;background:#1b293c;border:1px solid #4a6281;border-radius:12px;padding:18px}.decision-panel.hidden{display:none}.decision-heading{display:flex;align-items:center;justify-content:space-between}.decision-heading h2{margin:0}.decision-heading span{color:#a6c6eb;font-size:12px}.decision-panel p{font-size:13px;color:#b7c9df}.strategy-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.strategy-grid>div{padding:12px;background:#24364e;border:1px solid #3b526f;border-radius:10px;display:flex;flex-direction:column;gap:7px}.strategy-grid .chosen{border:2px solid #72b9ff;background:#27456b}.strategy-grid small{color:#9eb5d0;font-size:11px}.strategy-grid .probability{font-size:12px;color:#f5cc75}@media(max-width:650px){.strategy-grid{grid-template-columns:1fr}}
@@ -82,3 +82,54 @@
 /* v2.4: Keep both player profiles visible; reserve the center column
    without showing turn or round labels. */
 .hud > .center { visibility: hidden; }
+
+.jev-toggle{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid #547092;border-radius:10px;font-size:14px;cursor:pointer}.jev-toggle input{width:18px;height:18px;accent-color:#68b4ff}.jev-toggle span{display:grid;gap:3px}.jev-toggle small{margin:0!important}.jev-toggle:has(input:disabled){opacity:.45}
+
+/* The active player is highlighted from the first frame and throughout the shot. */
+.hud #p1hud.active-turn{background:rgba(70,149,223,.23);border:2px solid #68baff;box-shadow:0 0 0 2px rgba(104,186,255,.15),inset 0 0 20px rgba(70,149,223,.12)}
+.hud #p2hud.active-turn{background:rgba(228,108,102,.23);border:2px solid #ff928a;box-shadow:0 0 0 2px rgba(255,146,138,.15),inset 0 0 20px rgba(228,108,102,.12)}
+
+/* v4.6: Make the active turn unmistakable from the very first game frame.
+   Attribute and class are both synchronized by syncTurnProfile(). */
+.hud #p1hud.active-turn, .hud #p1hud[data-current-turn]{
+  background:rgba(70,149,223,.23);border:2px solid #68baff;
+  outline:2px solid #68baff;outline-offset:0;
+  box-shadow:0 0 0 2px rgba(104,186,255,.16),inset 0 0 20px rgba(70,149,223,.12);
+}
+.hud #p2hud.active-turn, .hud #p2hud[data-current-turn]{
+  background:rgba(228,108,102,.23);border:2px solid #ff928a;
+  outline:2px solid #ff928a;outline-offset:0;
+  box-shadow:0 0 0 2px rgba(255,146,138,.16),inset 0 0 20px rgba(228,108,102,.12);
+}
+
+/* v5.1: previous shot reference remains fixed while the next charge grows. */
+.power-meter{position:relative;isolation:isolate}
+.power-reference{position:absolute;top:-3px;bottom:-3px;width:2px;transform:translateX(-50%);background:#fff;box-shadow:0 0 0 1px rgba(15,27,42,.32),0 0 5px rgba(255,255,255,.45);z-index:2;pointer-events:none;border-radius:1px}
+.power-reference[hidden]{display:none}
+
+/* v5.4: one turn-state-driven highlight, with sufficient specificity. */
+.hud #p1hud[data-current-turn="true"]{border:2px solid #68baff!important;outline:2px solid #68baff!important;outline-offset:0;background:rgba(70,149,223,.23)!important;box-shadow:0 0 0 2px rgba(104,186,255,.16),inset 0 0 20px rgba(70,149,223,.12)!important}
+.hud #p2hud[data-current-turn="true"]{border:2px solid #ff928a!important;outline:2px solid #ff928a!important;outline-offset:0;background:rgba(228,108,102,.23)!important;box-shadow:0 0 0 2px rgba(255,146,138,.16),inset 0 0 20px rgba(228,108,102,.12)!important}
+
+/* v5.6: HUD highlight is derived from the same actor state as the canvas badge.
+   Parent-level selector also avoids accidental dependence on stale card classes. */
+.hud[data-active-player="player"] > #p1hud,
+.hud[data-active-player="ai"] > #p2hud {
+  border-width:2px!important;
+  border-style:solid!important;
+  outline-width:2px!important;
+  outline-style:solid!important;
+  outline-offset:0;
+}
+.hud[data-active-player="player"] > #p1hud {
+  border-color:#68baff!important;
+  outline-color:#68baff!important;
+  background:rgba(70,149,223,.23)!important;
+  box-shadow:0 0 0 2px rgba(104,186,255,.16),inset 0 0 20px rgba(70,149,223,.12)!important;
+}
+.hud[data-active-player="ai"] > #p2hud {
+  border-color:#ff928a!important;
+  outline-color:#ff928a!important;
+  background:rgba(228,108,102,.23)!important;
+  box-shadow:0 0 0 2px rgba(255,146,138,.16),inset 0 0 20px rgba(228,108,102,.12)!important;
+}
