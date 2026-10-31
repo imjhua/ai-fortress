@@ -1,6 +1,7 @@
-const W=960,H=500,GROUND=470,GRAVITY=480,DT=1/120,MAX_TURNS=10;
+const W=960,H=500,GROUND=470,GRAVITY=480,DT=1/120,MAX_TURNS=10,MATCH_ROUNDS=5;
 const $=id=>document.getElementById(id),canvas=$('game'),ctx=canvas.getContext('2d');
 let state,raf,last=0;
+let matchRound=1; // One setup selection covers five consecutive battles.
 let playerTypes={player:"human",ai:"physics"},gameStarted=false,jevConfigured=false;
 const actorName=a=>playerTypes[a]==="human"?(a==="player"?"1P 사용자":"2P 사용자"):"AI Player";
 const actorType=a=>playerTypes[a];
@@ -19,8 +20,8 @@ function syncPowerReference(){
  if(valid)marker.style.left=`${clamp(lastPlayerPower,0,100)}%`;
 }
 function resetCharge(){charging=false;chargedPower=0;}
-function beginCharge(){if(!state||!isHumanTurn()||charging)return;charging=true;chargeStart=performance.now();chargedPower=0;update()}
-function releaseCharge(){if(!charging)return;updateCharge(performance.now());const power=chargedPower;charging=false;if(isHumanTurn()){lastPlayerPower=power;lastPowerByActor[currentActor()]=power;fire(currentActor(),Number($('angle').value),power)}else update()}
+function beginCharge(){if(!state||!isHumanTurn()||charging||state[currentActor()].falling)return;charging=true;chargeStart=performance.now();chargedPower=0;update()}
+function releaseCharge(){if(!charging)return;updateCharge(performance.now());const power=chargedPower;charging=false;if(isHumanTurn()&&!state[currentActor()].falling){lastPlayerPower=power;lastPowerByActor[currentActor()]=power;fire(currentActor(),Number($('angle').value),power)}else update()}
 function updateCharge(now){if(!charging||!isHumanTurn())return;const steps=Math.floor((now-chargeStart)/CHARGE_MS*(MAX_POWER-MIN_POWER));chargedPower=Math.min(MAX_POWER,MIN_POWER+steps);$('powerValue').textContent=chargedPower+'%';$('powerFill').style.width=chargedPower+'%';$('powerMeter').setAttribute('aria-valuenow',String(chargedPower))}
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 function rng(seed){let s=seed>>>0;return()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296}}
@@ -139,15 +140,36 @@ function supportAt(x,footY){
  for(let y=Math.max(0,Math.floor(footY));y<H;y++)if(state.solid[y*W+ix])return y;
  return H+100;
 }
+// Tank gravity is simulated in frame(), independently of the collision mask.
+// A lower bridge is a valid landing surface; falling off the world is fatal.
 function settleTank(t){
- const target=supportAt(t.x,t.y+12-22);
- if(target>t.y+12+1){
-  const fall=target-(t.y+12);
-  t.y=target-12;
-  if(target>=H){t.hp=0;return 100}
-  if(fall>40){const damage=Math.min(75,Math.floor((fall-40)*.35));t.hp=clamp(t.hp-damage,0,100);return damage}
- }else if(target<t.y+12){t.y=target-12}
+ const feet=t.y+12;
+ const ground=supportAt(t.x,feet-3);
+ if(ground>=H+100 || ground>feet+2){
+  t.falling=true;
+  t.vy=Math.max(0,t.vy||0);
+  t.fallStart??=feet;
+  return 0;
+ }
+ if(ground<feet){t.y=ground-12;}
+ t.falling=false;t.vy=0;t.fallStart=null;
  return 0;
+}
+function advanceTankFall(t,dt){
+ if(!t.falling||t.hp<=0)return;
+ const feet=t.y+12;
+ const nextVy=Math.min(650,(t.vy||0)+1050*dt);
+ const nextFeet=feet+nextVy*dt;
+ const floor=supportAt(t.x,feet-2);
+ if(floor<H && floor>=feet-2 && floor<=nextFeet){
+  t.y=floor-12;t.falling=false;t.vy=0;
+  const distance=Math.max(0,floor-(t.fallStart??feet));
+  t.fallStart=null;
+  if(distance>40){const damage=Math.min(75,Math.floor((distance-40)*.35));t.hp=Math.max(0,t.hp-damage);update();if(t.hp<=0)endGame();}
+ }else{
+  t.y=nextFeet-12;t.vy=nextVy;
+  if(nextFeet>H+20){t.falling=false;t.hp=0;update();endGame();}
+ }
 }
 // Terrain collision stays at 960x500. Visuals are supersampled independently
 // so sloping floating platforms remain smooth on high-density displays.
@@ -334,16 +356,18 @@ function canMoveTank(fromX,toX,t){
  return true;
 }
 
+function moveTank(actor,delta){
+ if(!state||state.phase!=='player')return false;
+ const t=state[actor],other=state[actor==='player'?'ai':'player'];
+ if(t.falling)return false;
+ const next=clamp(t.x+delta,25,W-25);
+ if(Math.abs(next-other.x)<45||!canMoveTank(t.x,next,t))return false;
+ t.x=next;settleTank(t);
+ return true;
+}
 function movePlayer(delta){
  if(!isHumanTurn())return;
- const actor=currentActor(),t=state[actor],other=state[actor==='player'?'ai':'player'];
- const next=clamp(t.x+delta,25,W-25);
- if(Math.abs(next-other.x)<45)return;
- if(canMoveTank(t.x,next,t)){
-  t.x=next;
-  settleTank(t);
-  if(t.hp<=0)endGame();
- }
+ moveTank(currentActor(),delta);
 }
 
 // v5.9: opt-in turn/HUD diagnostics. Enable with ?debugTurn=1 or localStorage.setItem('fortressDebugTurn','1').
@@ -385,8 +409,8 @@ function syncTurnProfile(reason="sync"){
  traceTurnProfile(reason);
 }
 
-function update(){if(!state)return;const a=state.currentActor;const human=isHumanTurn();$('php').textContent=state.player.hp;$('ahp').textContent=state.ai.hp;$('pbar').style.width=state.player.hp+'%';$('abar').style.width=state.ai.hp+'%';$('p1hpMeter').setAttribute('aria-valuenow',String(state.player.hp));$('p2hpMeter').setAttribute('aria-valuenow',String(state.ai.hp));$('pbar').classList.toggle('hp-critical',state.player.hp<=25);$('abar').classList.toggle('hp-critical',state.ai.hp<=25);$('p1name').textContent=playerTypes.player!=='human'?'AI Player':'1P 사용자';$('p2name').textContent=playerTypes.ai!=='human'?'AI Player':'2P 사용자';$('turn').textContent=state.phase==='player'?`${actorName(a)} 턴`:({flight:'포탄 비행 중',resolve:'폭발!',over:'게임 종료'})[state.phase];$('round').textContent=`ROUND ${state.round}/${MAX_TURNS}`;$('powerValue').textContent=chargedPower+'%';$('powerFill').style.width=chargedPower+'%';$('powerMeter').setAttribute('aria-valuenow',String(chargedPower));syncPowerReference();syncTurnProfile();document.querySelectorAll('#touchControls button').forEach(button=>button.disabled=!human);$('angle').disabled=!human;$('powerMeter').setAttribute('aria-disabled',String(!human));$('powerValue').closest('.controls').classList.toggle('is-inactive',!human);$('touchControls').classList.toggle('is-inactive',!human)}
-function scheduleBot(){if(!gameStarted||state.phase!=='player'||!['physics','jev'].includes(actorType(currentActor())))return;const token=state.token,actor=currentActor();setTimeout(()=>{if(token===state.token&&state.phase==='player'&&currentActor()===actor)(actorType(actor)==='jev'?jevTurn(token,actor):botTurn(token,actor))},450)}
+function update(){if(!state)return;const a=state.currentActor;const human=isHumanTurn();$('php').textContent=state.player.hp;$('ahp').textContent=state.ai.hp;$('pbar').style.width=state.player.hp+'%';$('abar').style.width=state.ai.hp+'%';$('p1hpMeter').setAttribute('aria-valuenow',String(state.player.hp));$('p2hpMeter').setAttribute('aria-valuenow',String(state.ai.hp));$('pbar').classList.toggle('hp-critical',state.player.hp<=25);$('abar').classList.toggle('hp-critical',state.ai.hp<=25);$('p1name').textContent=playerTypes.player!=='human'?'AI Player':'1P 사용자';$('p2name').textContent=playerTypes.ai!=='human'?'AI Player':'2P 사용자';$('turn').textContent=state.phase==='player'?`${actorName(a)} 턴`:({flight:'포탄 비행 중',resolve:'폭발!',over:'게임 종료'})[state.phase];$('round').textContent=`ROUND ${matchRound} / ${MATCH_ROUNDS}`;$('powerValue').textContent=chargedPower+'%';$('powerFill').style.width=chargedPower+'%';$('powerMeter').setAttribute('aria-valuenow',String(chargedPower));syncPowerReference();syncTurnProfile();document.querySelectorAll('#touchControls button').forEach(button=>button.disabled=!human);$('angle').disabled=!human;$('powerMeter').setAttribute('aria-disabled',String(!human));$('powerValue').closest('.controls').classList.toggle('is-inactive',!human);$('touchControls').classList.toggle('is-inactive',!human)}
+function scheduleBot(){if(!gameStarted||state.phase!=='player'||state.player.falling||state.ai.falling||!['physics','jev'].includes(actorType(currentActor())))return;const token=state.token,actor=currentActor();setTimeout(()=>{if(token===state.token&&state.phase==='player'&&currentActor()===actor)(actorType(actor)==='jev'?jevTurn(token,actor):botTurn(token,actor))},450)}
 
 const BARREL_LENGTH=31;
 const BARREL_WIDTH=9;
@@ -436,8 +460,9 @@ function finishShot(hit,actor){
  for(const name of ['player','ai'])if(damages[name]>0){state.damageEffects.push({name,damage:damages[name],started:performance.now(),until:performance.now()+1100})}
  state.projectile=null;update();
  const token=state.token;
- setTimeout(()=>{
-  if(token!==state.token)return;
+ setTimeout(function finishResolution(){
+  if(token!==state.token||state.phase==='over')return;
+  if(state.player.falling||state.ai.falling){setTimeout(finishResolution,80);return;}
   if(state.player.hp<=0||state.ai.hp<=0||(state.round>=MAX_TURNS&&actor==='ai')){endGame();return}
   if(actor==='player')state.currentActor='ai';else{state.round++;state.currentActor='player'}
   state.phase='player';nextWind();update();scheduleBot();
@@ -445,7 +470,30 @@ function finishShot(hit,actor){
 }
 function fire(actor,angle,power){if(!['player','ai'].includes(actor))return;lastPowerByActor[actor]=power;const t=state[actor],dir=actor==='player'?1:-1,o=origin(t,angle,dir);state.lastAngles??={};state.lastAngles[actor]=angle;state.projectile={...o,dir,angle,power,t:0,actor,prev:o};state.phase='flight';state.shots++;update()}
 function candidates(actor){const enemy=actor==='player'?'ai':'player',dir=actor==='player'?1:-1,arr=[];for(let angle=12;angle<=80;angle+=4){for(let power=24;power<=100;power+=4){const o=origin(state[actor],angle,dir),hit=simulate({...o,angle,power,dir});const enemyDamage=hit.kind==='miss'?0:Math.max(damageAt(hit.x,hit.y,state[enemy]),hit.target===enemy?32:0);const selfDamage=hit.kind==='miss'?0:Math.max(damageAt(hit.x,hit.y,state[actor]),hit.target===actor?32:0);const distance=Math.abs(hit.x-state[enemy].x);const score=enemyDamage*10-selfDamage*15-Math.min(distance,500)*.12;arr.push({id:`a${angle}p${power}`,angle,power,enemyDamage,selfDamage,landingX:Math.round(hit.x),targetDistance:Math.round(distance),score})}}arr.sort((a,b)=>b.score-a.score);return arr.slice(0,5)}
-async function botTurn(token,actor){const list=candidates(actor),choice=list[0];if(token!==state.token||state.phase!=='player'||state.currentActor!==actor)return;log(`${actorName(actor)} Physics Bot: 각도 ${choice.angle}°, 파워 ${choice.power}%`);await new Promise(r=>setTimeout(r,500));if(token===state.token&&state.phase==='player'&&state.currentActor===actor)fire(actor,choice.angle,choice.power)}
+async function botTurn(token,actor){
+ // The Physics Bot may reposition before aiming; every step uses the same
+ // terrain/wall checks and gravity as the human player.
+ const valid=()=>token===state.token&&state.phase==='player'&&state.currentActor===actor;
+ if(!valid())return;
+ const enemy=state[actor==='player'?'ai':'player'];
+ const t=state[actor];
+ const direction=Math.sign(enemy.x-t.x);
+ // A small tactical reposition, never a teleport. Sometimes hold position.
+ const steps=Math.abs(enemy.x-t.x)>230?3:1;
+ for(let i=0;i<steps&&valid();i++){
+  if(t.falling)break;
+  const moved=moveTank(actor,direction*5);
+  if(!moved)break;
+  await new Promise(r=>setTimeout(r,130));
+ }
+ while(valid()&&t.falling)await new Promise(r=>setTimeout(r,80));
+ if(!valid())return;
+ const choice=candidates(actor)[0];
+ if(!choice)return;
+ log(`${actorName(actor)} Physics Bot: 각도 ${choice.angle}°, 파워 ${choice.power}%`);
+ await new Promise(r=>setTimeout(r,400));
+ if(valid())fire(actor,choice.angle,choice.power);
+}
 
 function resetDecisionPanel(){
  $('decisionPanel').classList.toggle('hidden',!Object.values(playerTypes).includes('jev'));
@@ -493,7 +541,7 @@ async function jevTurn(token,actor){
   await new Promise(r=>setTimeout(r,1100));if(token===state.token&&state.phase==='player'&&state.currentActor===actor)fire(actor,chosen.angle,chosen.power);
  }catch(error){if(token!==state.token)return;$('jevStatus').textContent='판단 실패';$('decisionResult').textContent=`Jev 응답 실패: ${error.message}. 다른 AI로 대체하지 않습니다.`;log('Jev 오류: '+error.message);state.phase='jev-error';update()}
 }
-function endGame(){state.phase='over';state.winner=state.ai.hp===state.player.hp?'draw':state.ai.hp<state.player.hp?'player':'ai';if(state.winner==='player')state.score+=1000+state.player.hp*5+Math.max(0,MAX_TURNS-state.round)*50;else if(state.winner==='draw')state.score+=300;$('resultTitle').textContent=state.winner==='draw'?'🤝 무승부':`🏆 ${state.winner==='player'?$('p1name').textContent:$('p2name').textContent} 승리!`;$('overlay').classList.remove('hidden');update()}
+function endGame(){state.phase='over';state.winner=state.ai.hp===state.player.hp?'draw':state.ai.hp<state.player.hp?'player':'ai';if(state.winner==='player')state.score+=1000+state.player.hp*5+Math.max(0,MAX_TURNS-state.round)*50;else if(state.winner==='draw')state.score+=300;$('resultTitle').textContent=state.winner==='draw'?'🤝 무승부':`🏆 ${state.winner==='player'?$('p1name').textContent:$('p2name').textContent} 승리!`;$('overlay').classList.remove('hidden');$('again').textContent=matchRound<MATCH_ROUNDS?'다음 라운드':'대전 설정';update()}
 function drawActiveTurn(t,name,now){
  if(!gameStarted||state.phase!=='player'||state.currentActor!==name)return;
  const y=tankY(t),pulse=(Math.sin(now*.005)+1)/2;
@@ -610,9 +658,9 @@ function render(){
  if(state.explosion&&now<state.explosion.until){const t=1-(state.explosion.until-now)/420;ctx.strokeStyle=`rgba(255,139,35,${1-t})`;ctx.lineWidth=5;ctx.beginPath();ctx.arc(state.explosion.x,state.explosion.y,8+t*40,0,7);ctx.stroke()}
  ctx.fillStyle='#28455c';ctx.font='bold 13px sans-serif';ctx.textAlign='center';ctx.fillText(actorName('player'),state.player.x,tankY(state.player)-48);ctx.fillText(actorName('ai'),state.ai.x,tankY(state.ai)-48);
 }
-function frame(now){updateCharge(now);const elapsed=Math.min((now-last)/1000||0,.05);last=now;if(state?.projectile){const s=state.projectile;const steps=Math.max(1,Math.ceil(elapsed/DT));for(let i=0;i<steps;i++){s.t+=elapsed/steps;const p=point(s,s.t),prev=s.prev;let hit=null;for(let j=1;j<=4;j++){const f=j/4;hit=collide({x:prev.x+(p.x-prev.x)*f,y:prev.y+(p.y-prev.y)*f});if(hit)break}if(hit){finishShot(hit,s.actor);break}s.prev=p;if(s.t>5){finishShot({x:clamp(p.x,0,W-1),y:clamp(p.y,0,H),kind:'miss'},s.actor);break}}}render();raf=requestAnimationFrame(frame)}
+function frame(now){updateCharge(now);const elapsed=Math.min((now-last)/1000||0,.05);last=now;if(state&&state.phase!=='over'){advanceTankFall(state.player,elapsed);advanceTankFall(state.ai,elapsed);}if(state?.projectile){const s=state.projectile;const steps=Math.max(1,Math.ceil(elapsed/DT));for(let i=0;i<steps;i++){s.t+=elapsed/steps;const p=point(s,s.t),prev=s.prev;let hit=null;for(let j=1;j<=4;j++){const f=j/4;hit=collide({x:prev.x+(p.x-prev.x)*f,y:prev.y+(p.y-prev.y)*f});if(hit)break}if(hit){finishShot(hit,s.actor);break}s.prev=p;if(s.t>5){finishShot({x:clamp(p.x,0,W-1),y:clamp(p.y,0,H),kind:'miss'},s.actor);break}}}render();raf=requestAnimationFrame(frame)}
 $('new').onclick=()=>showSetup();
-$('again').onclick=()=>showSetup();
+$('again').onclick=()=>{if(matchRound<MATCH_ROUNDS){matchRound++;newGame()}else{showSetup()}};
 $('angle').oninput=update;
 // Keyboard and mobile controls share the same gameplay functions.
 function adjustAngle(delta){if(!isHumanTurn()||charging)return;$('angle').value=clamp(Number($('angle').value)+delta,10,80);update()}
@@ -674,6 +722,6 @@ $('startGame').onclick=()=>{
  if(wantsJev&&!jevConfigured)return;
  playerTypes={player:$('p1type').value,ai:$('p2type').value};
  if(wantsJev)for(const actor of ['player','ai'])if(playerTypes[actor]==='physics')playerTypes[actor]='jev';
- gameStarted=true;$('setup').classList.add('hidden');$('startGame').blur();newGame();traceTurnProfile('startGame:after-newGame');
+ matchRound=1;gameStarted=true;$('setup').classList.add('hidden');$('startGame').blur();newGame();traceTurnProfile('startGame:after-newGame');
 };
 updateSetup();$('startGame').focus({preventScroll:true});checkJev();requestAnimationFrame(frame);

@@ -81,7 +81,7 @@
 
 /* v2.4: Keep both player profiles visible; reserve the center column
    without showing turn or round labels. */
-.hud > .center { visibility: hidden; }
+.hud > .center { visibility: visible; }
 
 .jev-toggle{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid #547092;border-radius:10px;font-size:14px;cursor:pointer}.jev-toggle input{width:18px;height:18px;accent-color:#68b4ff}.jev-toggle span{display:grid;gap:3px}.jev-toggle small{margin:0!important}.jev-toggle:has(input:disabled){opacity:.45}
 
@@ -143,3 +143,86 @@
 
 /* v6.2: both ends of the power meter and its fill are square. */
 .power-meter, .power-fill { border-radius: 0 !important; }
+
+/* v6.5: show match progress between player profiles. */
+.hud > .center{visibility:visible;flex:0 0 auto;align-self:center;min-width:112px;gap:5px}
+.hud > .center #round{display:block;color:#e6f0ff;font-weight:800;letter-spacing:.045em;font-size:13px;white-space:nowrap}
+.hud > .center #turn{font-size:12px;color:#b8cce5;white-space:nowrap}
+@media(max-width:650px){.hud > .center{min-width:74px}.hud > .center #round{font-size:11px}.hud > .center #turn{font-size:10px;white-space:normal}}
+
+/* v6.6: Active player is communicated by highlighted profile; show round only. */
+.hud > .center #turn { display: none; }
+
+
+/* v6.7 — compact mobile HUD and two-thumb controls; desktop stays unchanged. */
+@media (hover:none) and (pointer:coarse) {
+  .app { padding: 8px; }
+  .app header { gap: 6px; margin-bottom: 12px; align-items: center; }
+  .app header h1 { font-size: 20px; }
+  .app header p { font-size: 11px; margin: 4px 0 0; }
+  .app header .top { width: auto; }
+  .app header #new { padding: 7px 10px; font-size: 12px; }
+  .hud { padding: 7px; gap: 5px; }
+  .hud .hp { min-height: 66px; padding: 7px; border-radius: 8px; }
+  .hud .hp .name { margin-bottom: 5px; font-size: 10px; }
+  .hud .hp .bar { height: 7px; }
+  .hud .hp-details { font-size: 10px; margin-bottom: 5px; }
+  .hud > .center { min-width: 66px; }
+  .hud > .center #round { font-size: 10px; letter-spacing: 0; }
+  /* Remove stacked outlines and shadows; the 2px active border is enough. */
+  .hud #p1hud.active-turn, .hud #p1hud[data-current-turn="true"],
+  .hud[data-active-player="player"] > #p1hud {
+    border: 2px solid #68baff !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: rgba(70,149,223,.16) !important;
+  }
+  .hud #p2hud.active-turn, .hud #p2hud[data-current-turn="true"],
+  .hud[data-active-player="ai"] > #p2hud {
+    border: 2px solid #ff928a !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: rgba(228,108,102,.16) !important;
+  }
+  .controls { padding: 10px 12px; }
+  .power-meter { height: 14px; }
+  .control label { margin-bottom: 6px; }
+  .touch-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(96px, .72fr);
+    grid-template-rows: auto auto;
+    align-items: center;
+    justify-items: center;
+    gap: 7px 10px;
+    padding: 12px 10px;
+  }
+  .touch-dpad {
+    grid-column: 1; grid-row: 1;
+    grid-template-columns: repeat(3, minmax(0, 48px));
+    grid-template-rows: repeat(2, 48px);
+    gap: 4px;
+  }
+  .touch-controls .touch-dpad button {
+    width: 48px; min-height: 48px; font-size: 18px;
+    border-radius: 8px;
+  }
+  .touch-controls .touch-space {
+    grid-column: 2; grid-row: 1;
+    width: 100%; max-width: 135px; min-height: 62px;
+    font-size: 16px; letter-spacing: .03em;
+    border-radius: 8px;
+  }
+  .touch-controls .touch-hint { grid-column: 1 / -1; grid-row: 2; font-size: 10px; }
+}
+@media (hover:none) and (pointer:coarse) and (max-width:360px) {
+  .touch-dpad { grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(2, 44px); }
+  .touch-controls .touch-dpad button { width: 44px; min-height: 44px; }
+  .hud > .center { min-width: 58px; }
+  .hud > .center #round { font-size: 9px; }
+}
+@media (hover:none) and (pointer:coarse) and (orientation:landscape) and (max-height:550px) {
+  .touch-controls { grid-template-columns: 1fr minmax(90px,.6fr); }
+  .touch-dpad { grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(2, 44px); }
+  .touch-controls .touch-dpad button { width: 44px; min-height: 44px; }
+  .touch-controls .touch-space { min-height: 52px; }
+}
