@@ -226,3 +226,6 @@
   .touch-controls .touch-dpad button { width: 44px; min-height: 44px; }
   .touch-controls .touch-space { min-height: 52px; }
 }
+
+/* Background music toggle */
+#bgmToggle{white-space:nowrap;padding:9px 12px;font-size:12px}@media(max-width:600px){.top{gap:6px}#bgmToggle{padding:8px;font-size:11px}}
